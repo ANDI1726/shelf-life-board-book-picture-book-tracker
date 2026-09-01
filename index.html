@@ -28,6 +28,7 @@
     --warning: #E67E22;
     --warning-bg: #FEF3E2;
     --radius-card: 18px 18px 6px 6px;
+    --shadow: 0 1px 0 rgba(46,43,78,0.05);
     --toast-duration: 3200ms;
   }
 
@@ -110,7 +111,7 @@
   /* ---------- Stats ---------- */
   .stats{
     display:grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 14px;
     margin-bottom: 26px;
   }
@@ -774,62 +775,33 @@
    *  Constants
    * ============================================================ */
   const STORAGE_KEY = 'masaSimpanBooks';
-  const STORAGE_BACKUP_KEY = 'masaSimpanBooks_backupRusak';
-  const LOADING_THRESHOLD_MS = 150; // hindari kedipan spinner pada operasi cepat
-  const NOTES_MAX_LENGTH = 240;
 
   const statusLabels = { owned: 'Dimiliki', borrowed: 'Dipinjam', wishlist: 'Daftar keinginan' };
   const ageLabels = { '0-2': '0–2 tahun', '3-5': '3–5 tahun', '6-8': '6–8 tahun' };
 
-  let books = [];
+  let books = loadBooks();
   let currentRating = 0;
   let editingId = null;
-  let pendingDeleteId = null;
   let activeFilters = { status: 'all', age: 'all', search: '' };
 
-  /* ============================================================
-   *  Penyimpanan & pemulihan data rusak
-   * ============================================================ */
   function loadBooks(){
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw) return [];
     try{
-      const parsed = JSON.parse(raw);
-      if(!Array.isArray(parsed)) throw new Error('Format data bukan daftar buku');
-      return parsed;
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
     }catch(e){
-      console.error('Gagal memuat data buku, data akan dicadangkan dan direset', e);
-      try{ localStorage.setItem(STORAGE_BACKUP_KEY, raw); }catch(_){ /* abaikan bila gagal cadangkan */ }
-      showCorruptBanner();
+      console.error('Gagal memuat data buku', e);
       return [];
     }
   }
 
-  function showCorruptBanner(){
-    const banner = document.getElementById('corruptBanner');
-    const text = document.getElementById('corruptBannerText');
-    text.textContent = 'Data koleksi sebelumnya tidak terbaca dan sudah direset agar aplikasi tetap berjalan. Salinan aslinya disimpan di penyimpanan browser dengan kunci "' + STORAGE_BACKUP_KEY + '".';
-    banner.classList.add('visible');
-  }
-
   function saveBooks(){
-    try{
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
-      return true;
-    }catch(e){
-      console.error('Gagal menyimpan data buku', e);
-      showToast('Gagal menyimpan perubahan. Ruang penyimpanan browser mungkin penuh.', 'error');
-      return false;
-    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
   }
 
   function uid(){
     return 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
   }
 
-  /* ============================================================
-   *  Utilitas
-   * ============================================================ */
   function starSVG(filled){
     return `<svg viewBox="0 0 24 24" fill="${filled ? 'var(--star)' : 'none'}" stroke="var(--star)" stroke-width="1.5">
       <polygon points="12 2 15.09 8.63 22 9.24 16.5 14.14 18.18 21 12 17.27 5.82 21 7.5 14.14 2 9.24 8.91 8.63"/>
@@ -837,7 +809,7 @@
   }
 
   function renderStarsDisplay(rating){
-    let html = `<div class="stars" role="img" aria-label="Peringkat ${rating} dari 5 bintang">`;
+    let html = '<div class="stars">';
     for(let i=1;i<=5;i++){ html += starSVG(i<=rating); }
     html += '</div>';
     return html;
@@ -850,18 +822,9 @@
       const span = document.createElement('span');
       span.innerHTML = starSVG(i<=currentRating);
       span.dataset.value = i;
-      span.setAttribute('role', 'radio');
-      span.setAttribute('tabindex', '0');
-      span.setAttribute('aria-checked', i === currentRating ? 'true' : 'false');
-      span.setAttribute('aria-label', i + ' bintang');
-      const pick = () => {
+      span.addEventListener('click', () => {
         currentRating = i;
         buildStarInput();
-        clearFieldError('starInput');
-      };
-      span.addEventListener('click', pick);
-      span.addEventListener('keydown', (e) => {
-        if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); pick(); }
       });
       container.appendChild(span);
     }
@@ -869,122 +832,29 @@
 
   function escapeHTML(str){
     const div = document.createElement('div');
-    div.textContent = str == null ? '' : String(str);
+    div.textContent = str;
     return div.innerHTML;
   }
 
-  /* Bungkus operasi render agar spinner hanya muncul jika benar-benar lambat,
-     mencegah kedipan pada operasi yang selesai dalam sekejap. */
-  function withLoadingGuard(container, loadingLabel, fn){
-    let spinnerShown = false;
-    const timer = setTimeout(() => {
-      spinnerShown = true;
-      container.innerHTML = `<div class="loading-state"><div class="spinner" aria-hidden="true"></div><span>${escapeHTML(loadingLabel)}</span></div>`;
-    }, LOADING_THRESHOLD_MS);
-    try{
-      fn();
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-  /* ============================================================
-   *  Toast
-   * ============================================================ */
-  function showToast(message, type){
-    const container = document.getElementById('toastContainer');
-    const toast = document.createElement('div');
-    toast.className = 'toast' + (type ? ' ' + type : '');
-    toast.textContent = message;
-    container.appendChild(toast);
-    requestAnimationFrame(() => toast.classList.add('show'));
-    const duration = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--toast-duration')) || 3200;
-    setTimeout(() => {
-      toast.classList.remove('show');
-      setTimeout(() => toast.remove(), 250);
-    }, duration);
-  }
-
-  /* ============================================================
-   *  Data murni: mudah diuji, tidak menyentuh DOM
-   * ============================================================ */
-  function filterBooks(list, filters){
-    return list.filter(b => {
-      if(filters.status !== 'all' && b.status !== filters.status) return false;
-      if(filters.age !== 'all' && b.age !== filters.age) return false;
-      if(filters.search){
-        const q = filters.search.toLowerCase();
-        if(!b.title.toLowerCase().includes(q) && !b.author.toLowerCase().includes(q)) return false;
-      }
-      return true;
-    });
-  }
-
-  function getFilteredBooks(){
-    return filterBooks(books, activeFilters);
-  }
-
-  function validateBookForm(data){
-    const errors = {};
-    if(!data.title || !data.title.trim()) errors.title = 'Judul wajib diisi.';
-    if(!data.author || !data.author.trim()) errors.author = 'Nama pengarang wajib diisi.';
-    if(!data.rating || data.rating < 1 || data.rating > 5) errors.rating = 'Pilih peringkat 1 sampai 5 bintang.';
-    if(data.notes && data.notes.length > NOTES_MAX_LENGTH) errors.notes = `Catatan maksimal ${NOTES_MAX_LENGTH} karakter.`;
-    return errors;
-  }
-
-  /* ============================================================
-   *  Validasi form (DOM)
-   * ============================================================ */
-  const fieldErrorMap = { title: 'fieldTitleErr', author: 'fieldAuthorErr', rating: 'starInputErr', notes: 'fieldNotesErr' };
-  const fieldInputMap = { title: 'fieldTitle', author: 'fieldAuthor', notes: 'fieldNotes' };
-
-  function clearFieldError(inputId){
-    const key = Object.keys(fieldInputMap).find(k => fieldInputMap[k] === inputId) ||
-                (inputId === 'starInput' ? 'rating' : null);
-    if(!key) return;
-    const input = document.getElementById(fieldInputMap[key]);
-    if(input){ input.classList.remove('field-error'); input.removeAttribute('aria-invalid'); }
-    const errEl = document.getElementById(fieldErrorMap[key]);
-    if(errEl){ errEl.textContent = ''; errEl.classList.remove('visible'); }
-  }
-
-  function clearAllFieldErrors(){
-    Object.keys(fieldErrorMap).forEach(key => {
-      const errEl = document.getElementById(fieldErrorMap[key]);
-      if(errEl){ errEl.textContent = ''; errEl.classList.remove('visible'); }
-      const input = document.getElementById(fieldInputMap[key]);
-      if(input){ input.classList.remove('field-error'); input.removeAttribute('aria-invalid'); }
-    });
-  }
-
-  function showFieldErrors(errors){
-    let firstInvalid = null;
-    Object.keys(errors).forEach(key => {
-      const errEl = document.getElementById(fieldErrorMap[key]);
-      if(errEl){ errEl.textContent = errors[key]; errEl.classList.add('visible'); }
-      const input = document.getElementById(fieldInputMap[key]);
-      if(input){
-        input.classList.add('field-error');
-        input.setAttribute('aria-invalid', 'true');
-        if(!firstInvalid) firstInvalid = input;
-      } else if(key === 'rating' && !firstInvalid){
-        firstInvalid = document.getElementById('starInput');
-      }
-    });
-    if(firstInvalid) firstInvalid.focus();
-  }
-
-  /* ============================================================
-   *  Ringkasan & daftar
-   * ============================================================ */
   function updateCounts(){
     document.getElementById('countOwned').textContent = books.filter(b => b.status === 'owned').length;
     document.getElementById('countBorrowed').textContent = books.filter(b => b.status === 'borrowed').length;
     document.getElementById('countWishlist').textContent = books.filter(b => b.status === 'wishlist').length;
   }
 
-  function paintGrid(){
+  function getFilteredBooks(){
+    return books.filter(b => {
+      if(activeFilters.status !== 'all' && b.status !== activeFilters.status) return false;
+      if(activeFilters.age !== 'all' && b.age !== activeFilters.age) return false;
+      if(activeFilters.search){
+        const q = activeFilters.search.toLowerCase();
+        if(!b.title.toLowerCase().includes(q) && !b.author.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }
+
+  function render(){
     updateCounts();
     const grid = document.getElementById('bookGrid');
     const filtered = getFilteredBooks();
@@ -992,7 +862,7 @@
     if(filtered.length === 0){
       grid.innerHTML = `
         <div class="empty">
-          <svg width="64" height="64" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
             <rect x="8" y="16" width="14" height="36" rx="2" fill="#E5DBC8"/>
             <rect x="25" y="10" width="14" height="42" rx="2" fill="#EFEAF9"/>
             <rect x="42" y="18" width="14" height="34" rx="2" fill="#E5DBC8"/>
@@ -1013,32 +883,25 @@
         </div>
         <div class="badge-row">
           <span class="badge status-${b.status}">${statusLabels[b.status]}</span>
-          <span class="badge age">${ageLabels[b.age] || escapeHTML(b.age)}</span>
+          <span class="badge age">${ageLabels[b.age] || b.age}</span>
         </div>
         ${renderStarsDisplay(b.rating)}
         ${b.notes ? `<p class="notes">"${escapeHTML(b.notes)}"</p>` : ''}
         <div class="card-actions">
-          <button class="icon-btn" data-action="edit" data-id="${b.id}" aria-label="Ubah ${escapeHTML(b.title)}">Ubah</button>
-          <button class="icon-btn danger" data-action="delete" data-id="${b.id}" aria-label="Hapus ${escapeHTML(b.title)}">Hapus</button>
+          <button class="icon-btn" data-action="edit" data-id="${b.id}">Ubah</button>
+          <button class="icon-btn danger" data-action="delete" data-id="${b.id}">Hapus</button>
         </div>
       </article>
     `).join('');
   }
 
-  function render(){
-    withLoadingGuard(document.getElementById('bookGrid'), 'Memuat koleksi...', paintGrid);
-  }
-
-  /* ============================================================
-   *  Modal tambah/ubah
-   * ============================================================ */
+  // ---- Modal handling ----
   const overlay = document.getElementById('overlay');
   const form = document.getElementById('bookForm');
   const modalTitle = document.getElementById('modalTitle');
 
   function openModal(book){
     editingId = book ? book.id : null;
-    clearAllFieldErrors();
     modalTitle.textContent = book ? 'Ubah buku' : 'Tambah buku';
     document.getElementById('fieldTitle').value = book ? book.title : '';
     document.getElementById('fieldAuthor').value = book ? book.author : '';
@@ -1054,7 +917,6 @@
   function closeModal(){
     overlay.classList.remove('open');
     form.reset();
-    clearAllFieldErrors();
     editingId = null;
     currentRating = 0;
   }
@@ -1062,16 +924,6 @@
   document.getElementById('btnAdd').addEventListener('click', () => openModal(null));
   document.getElementById('btnCancel').addEventListener('click', closeModal);
   overlay.addEventListener('click', (e) => { if(e.target === overlay) closeModal(); });
-  document.addEventListener('keydown', (e) => {
-    if(e.key === 'Escape'){
-      if(overlay.classList.contains('open')) closeModal();
-      if(confirmOverlay.classList.contains('open')) closeConfirm();
-    }
-  });
-
-  ['fieldTitle', 'fieldAuthor', 'fieldNotes'].forEach(id => {
-    document.getElementById(id).addEventListener('input', () => clearFieldError(id));
-  });
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1081,14 +933,8 @@
     const status = document.getElementById('fieldStatus').value;
     const notes = document.getElementById('fieldNotes').value.trim();
 
-    const errors = validateBookForm({ title, author, rating: currentRating, notes });
-    clearAllFieldErrors();
-    if(Object.keys(errors).length > 0){
-      showFieldErrors(errors);
-      return;
-    }
+    if(!title || !author) return;
 
-    const isNew = !editingId;
     if(editingId){
       const idx = books.findIndex(b => b.id === editingId);
       if(idx > -1){
@@ -1098,45 +944,9 @@
       books.push({ id: uid(), title, author, age, status, notes, rating: currentRating });
     }
 
-    const saved = saveBooks();
+    saveBooks();
     closeModal();
     render();
-    if(saved){
-      showToast(isNew ? 'Buku ditambahkan ke rak.' : 'Perubahan buku disimpan.');
-    }
-  });
-
-  /* ============================================================
-   *  Konfirmasi hapus
-   * ============================================================ */
-  const confirmOverlay = document.getElementById('confirmOverlay');
-  const confirmDesc = document.getElementById('confirmDesc');
-
-  function openConfirm(book){
-    pendingDeleteId = book.id;
-    confirmDesc.textContent = `"${book.title}" akan dihapus dari koleksi. Tindakan ini tidak dapat dibatalkan.`;
-    confirmOverlay.classList.add('open');
-    document.getElementById('confirmCancel').focus();
-  }
-
-  function closeConfirm(){
-    confirmOverlay.classList.remove('open');
-    pendingDeleteId = null;
-  }
-
-  document.getElementById('confirmCancel').addEventListener('click', closeConfirm);
-  confirmOverlay.addEventListener('click', (e) => { if(e.target === confirmOverlay) closeConfirm(); });
-
-  document.getElementById('confirmOk').addEventListener('click', () => {
-    if(!pendingDeleteId) return;
-    const deleted = books.find(b => b.id === pendingDeleteId);
-    books = books.filter(b => b.id !== pendingDeleteId);
-    const saved = saveBooks();
-    closeConfirm();
-    render();
-    if(saved){
-      showToast(deleted ? `"${deleted.title}" dihapus dari koleksi.` : 'Buku dihapus dari koleksi.');
-    }
   });
 
   document.getElementById('bookGrid').addEventListener('click', (e) => {
@@ -1147,24 +957,21 @@
       const book = books.find(b => b.id === id);
       if(book) openModal(book);
     } else if(btn.dataset.action === 'delete'){
-      const book = books.find(b => b.id === id);
-      if(book) openConfirm(book);
+      if(confirm('Hapus buku ini dari koleksi?')){
+        books = books.filter(b => b.id !== id);
+        saveBooks();
+        render();
+      }
     }
   });
 
-  /* ============================================================
-   *  Filter (chip dengan peran radiogroup)
-   * ============================================================ */
+  // ---- Filters ----
   document.querySelectorAll('.chip-group').forEach(group => {
     group.addEventListener('click', (e) => {
       const chip = e.target.closest('.chip');
       if(!chip) return;
-      group.querySelectorAll('.chip').forEach(c => {
-        c.classList.remove('active');
-        c.setAttribute('aria-checked', 'false');
-      });
+      group.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
-      chip.setAttribute('aria-checked', 'true');
       const filterKey = group.dataset.filter;
       activeFilters[filterKey] = chip.dataset.value;
       render();
@@ -1176,125 +983,7 @@
     render();
   });
 
-  /* ============================================================
-   *  Panel pengujian otomatis — buka dengan ?tests=1
-   * ============================================================ */
-  function runTests(){
-    const results = [];
-    function test(name, fn){
-      try{ fn(); results.push({ name, pass: true }); }
-      catch(err){ results.push({ name, pass: false, error: err.message }); }
-    }
-    function assert(cond, msg){ if(!cond) throw new Error(msg || 'Pernyataan gagal'); }
-    function assertEqual(actual, expected, msg){
-      if(actual !== expected) throw new Error(msg || `Diharapkan ${JSON.stringify(expected)}, didapat ${JSON.stringify(actual)}`);
-    }
-
-    test('escapeHTML meng-escape tag skrip', () => {
-      const result = escapeHTML('<img src=x onerror=alert(1)>');
-      assert(!result.includes('<img'), 'Tag mentah tidak boleh lolos tanpa escape');
-    });
-
-    test('escapeHTML aman untuk nilai kosong', () => {
-      assertEqual(escapeHTML(undefined), '');
-      assertEqual(escapeHTML(null), '');
-    });
-
-    test('uid menghasilkan nilai unik', () => {
-      const seen = new Set();
-      for(let i=0;i<50;i++) seen.add(uid());
-      assertEqual(seen.size, 50, 'Setiap id seharusnya unik');
-    });
-
-    test('validateBookForm menolak judul kosong', () => {
-      const errors = validateBookForm({ title: '', author: 'Penulis', rating: 3, notes: '' });
-      assert(!!errors.title, 'Judul kosong seharusnya menghasilkan error');
-    });
-
-    test('validateBookForm menolak pengarang kosong', () => {
-      const errors = validateBookForm({ title: 'Judul', author: '  ', rating: 3, notes: '' });
-      assert(!!errors.author, 'Pengarang kosong seharusnya menghasilkan error');
-    });
-
-    test('validateBookForm menolak peringkat 0', () => {
-      const errors = validateBookForm({ title: 'Judul', author: 'Penulis', rating: 0, notes: '' });
-      assert(!!errors.rating, 'Peringkat 0 seharusnya menghasilkan error');
-    });
-
-    test('validateBookForm menolak catatan yang terlalu panjang', () => {
-      const errors = validateBookForm({ title: 'Judul', author: 'Penulis', rating: 3, notes: 'x'.repeat(NOTES_MAX_LENGTH + 1) });
-      assert(!!errors.notes, 'Catatan yang terlalu panjang seharusnya menghasilkan error');
-    });
-
-    test('validateBookForm menerima data valid', () => {
-      const errors = validateBookForm({ title: 'Ada Ulat Hijau', author: 'Eric Carle', rating: 4, notes: 'Favorit' });
-      assertEqual(Object.keys(errors).length, 0, 'Data valid tidak seharusnya menghasilkan error');
-    });
-
-    test('filterBooks menyaring berdasarkan status', () => {
-      const sample = [
-        { id: '1', title: 'A', author: 'X', status: 'owned', age: '0-2' },
-        { id: '2', title: 'B', author: 'Y', status: 'borrowed', age: '3-5' }
-      ];
-      const filtered = filterBooks(sample, { status: 'owned', age: 'all', search: '' });
-      assertEqual(filtered.length, 1, 'Filter status seharusnya hanya menyisakan 1 buku');
-    });
-
-    test('filterBooks menyaring berdasarkan rentang usia', () => {
-      const sample = [
-        { id: '1', title: 'A', author: 'X', status: 'owned', age: '0-2' },
-        { id: '2', title: 'B', author: 'Y', status: 'owned', age: '6-8' }
-      ];
-      const filtered = filterBooks(sample, { status: 'all', age: '6-8', search: '' });
-      assertEqual(filtered.length, 1, 'Filter usia seharusnya hanya menyisakan 1 buku');
-    });
-
-    test('filterBooks menyaring berdasarkan kata kunci tanpa peduli huruf besar/kecil', () => {
-      const sample = [
-        { id: '1', title: 'Ada Ulat Hijau', author: 'Eric Carle', status: 'owned', age: '0-2' }
-      ];
-      const filtered = filterBooks(sample, { status: 'all', age: 'all', search: 'ULAT' });
-      assertEqual(filtered.length, 1, 'Pencarian seharusnya tidak peduli besar/kecil huruf');
-    });
-
-    test('filterBooks mengembalikan daftar kosong bila tidak ada yang cocok', () => {
-      const sample = [
-        { id: '1', title: 'Ada Ulat Hijau', author: 'Eric Carle', status: 'owned', age: '0-2' }
-      ];
-      const filtered = filterBooks(sample, { status: 'wishlist', age: 'all', search: '' });
-      assertEqual(filtered.length, 0, 'Tidak ada buku wishlist pada data contoh');
-    });
-
-    return results;
-  }
-
-  function renderTestPanel(results){
-    const panel = document.getElementById('testPanel');
-    const passCount = results.filter(r => r.pass).length;
-    let html = `<div class="section">Hasil pengujian otomatis: ${passCount}/${results.length} lulus</div>`;
-    results.forEach(r => {
-      html += `<div class="${r.pass ? 'pass' : 'fail'}">${r.pass ? '✓' : '✗'} ${escapeHTML(r.name)}${r.pass ? '' : ' — ' + escapeHTML(r.error)}</div>`;
-    });
-    panel.innerHTML = html;
-    panel.classList.add('visible');
-  }
-
-  /* ============================================================
-   *  Inisialisasi
-   * ============================================================ */
-  function init(){
-    withLoadingGuard(document.getElementById('bookGrid'), 'Memuat koleksi...', () => {
-      books = loadBooks();
-      paintGrid();
-    });
-
-    const params = new URLSearchParams(window.location.search);
-    if(params.get('tests') === '1'){
-      renderTestPanel(runTests());
-    }
-  }
-
-  init();
+  render();
 })();
 </script>
 
