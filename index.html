@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Masa Simpan — Pelacak Buku Anak</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #FAF3E6;
+    --paper-raised: #FFFDF8;
+    --ink: #2E2B4E;
+    --ink-soft: #64607F;
+    --line: #E5DBC8;
+    --marigold: #F2A93B;
+    --marigold-dark: #D98F1F;
+    --owned: #2F8F6E;
+    --owned-bg: #E4F3EC;
+    --borrowed: #3E8FC2;
+    --borrowed-bg: #E5F1F9;
+    --wishlist: #D6547A;
+    --wishlist-bg: #FBE7ED;
+    --star: #EFB93D;
+    --danger: #C0392B;
+    --danger-bg: #FDECEA;
+    --warning: #E67E22;
+    --warning-bg: #FEF3E2;
+    --radius-card: 18px 18px 6px 6px;
+    --shadow: 0 1px 0 rgba(46,43,78,0.05);
+    --toast-duration: 3200ms;
+  }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin:0;
+    background: var(--paper);
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(46,43,78,0.05) 1px, transparent 0);
+    background-size: 22px 22px;
+    color: var(--ink);
+    font-family: 'Karla', sans-serif;
+    min-height: 100vh;
+    padding-bottom: 60px;
+  }
+
+  h1, h2, h3, .display{
+    font-family: 'Baloo 2', sans-serif;
+  }
+
+  .wrap{
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 36px 24px 0;
+  }
+
+  /* ---------- Header ---------- */
+  header.top{
+    display:flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+  }
+
+  .brand{
+    display:flex;
+    align-items:center;
+    gap: 14px;
+  }
+
+  .brand svg{ flex-shrink:0; }
+
+  .brand h1{
+    font-size: 2.1rem;
+    margin: 0;
+    line-height: 1;
+    color: var(--ink);
+    font-weight: 700;
+  }
+
+  .brand p{
+    margin: 6px 0 0;
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+  }
+
+  button.primary{
+    background: var(--marigold);
+    color: #3A2405;
+    border: none;
+    font-family: 'Baloo 2', sans-serif;
+    font-weight: 600;
+    font-size: 1rem;
+    padding: 13px 22px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 3px 0 var(--marigold-dark);
+    transition: transform 0.08s ease, box-shadow 0.08s ease;
+    white-space: nowrap;
+  }
+  button.primary:hover{ transform: translateY(-1px); }
+  button.primary:active{
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 var(--marigold-dark);
+  }
+
+  /* ---------- Stats ---------- */
+  .stats{
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 26px;
+  }
+
+  .stat{
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 16px 18px;
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+  }
+
+  .stat .num{
+    font-family:'Baloo 2', sans-serif;
+    font-size: 2rem;
+    font-weight: 700;
+    line-height:1;
+  }
+
+  .stat .label{
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    margin-top: 4px;
+  }
+
+  .stat .dot{
+    width: 12px; height: 12px; border-radius: 50%;
+    flex-shrink:0;
+  }
+
+  .stat.owned .num{ color: var(--owned); }
+  .stat.borrowed .num{ color: var(--borrowed); }
+  .stat.wishlist .num{ color: var(--wishlist); }
+  .stat.owned .dot{ background: var(--owned); }
+  .stat.borrowed .dot{ background: var(--borrowed); }
+  .stat.wishlist .dot{ background: var(--wishlist); }
+
+  /* ---------- Controls ---------- */
+  .controls{
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 16px 18px;
+    margin-bottom: 26px;
+    display:flex;
+    flex-direction:column;
+    gap: 12px;
+  }
+
+  .search-row{
+    display:flex;
+    gap: 10px;
+  }
+
+  .search-row input[type="text"]{
+    flex:1;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-family:'Karla', sans-serif;
+    font-size: 0.95rem;
+    background: var(--paper);
+    color: var(--ink);
+  }
+  .search-row input[type="text"]:focus{
+    outline: 2px solid var(--marigold);
+    outline-offset: 1px;
+  }
+
+  .chip-groups{
+    display:flex;
+    flex-wrap:wrap;
+    gap: 18px;
+  }
+
+  .chip-group{
+    display:flex;
+    align-items:center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .chip-group .gname{
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    margin-right: 2px;
+  }
+
+  .chip{
+    border: 1px solid var(--line);
+    background: var(--paper);
+    color: var(--ink-soft);
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-family:'Karla', sans-serif;
+    cursor: pointer;
+    transition: all 0.12s ease;
+  }
+  .chip:hover{ border-color: var(--ink-soft); }
+  .chip.active{
+    background: var(--ink);
+    border-color: var(--ink);
+    color: #fff;
+  }
+
+  /* ---------- Grid ---------- */
+  .grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 18px;
+  }
+
+  .card{
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    padding: 16px 16px 14px;
+    display:flex;
+    flex-direction:column;
+    gap: 8px;
+    position: relative;
+    border-top-width: 6px;
+  }
+
+  .card.status-owned{ border-top-color: var(--owned); }
+  .card.status-borrowed{ border-top-color: var(--borrowed); }
+  .card.status-wishlist{ border-top-color: var(--wishlist); }
+
+  .card .top-row{
+    display:flex;
+    justify-content: space-between;
+    align-items:flex-start;
+    gap: 8px;
+  }
+
+  .card h3{
+    font-size: 1.08rem;
+    margin: 0;
+    line-height: 1.25;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .card .author{
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    margin: -4px 0 0;
+  }
+
+  .badge-row{
+    display:flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items:center;
+  }
+
+  .badge{
+    font-size: 0.72rem;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-weight: 600;
+  }
+  .badge.age{
+    background: #EFEAF9;
+    color: #5A4E96;
+  }
+  .badge.status-owned{ background: var(--owned-bg); color: var(--owned); }
+  .badge.status-borrowed{ background: var(--borrowed-bg); color: var(--borrowed); }
+  .badge.status-wishlist{ background: var(--wishlist-bg); color: var(--wishlist); }
+
+  .stars{
+    display:flex;
+    gap: 2px;
+  }
+  .stars svg{ width: 16px; height: 16px; }
+
+  .notes{
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    font-style: italic;
+    margin: 2px 0 0;
+    line-height: 1.4;
+  }
+
+  .card-actions{
+    display:flex;
+    gap: 8px;
+    margin-top: auto;
+    padding-top: 8px;
+  }
+
+  .icon-btn{
+    border: 1px solid var(--line);
+    background: var(--paper);
+    border-radius: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+    font-family:'Karla', sans-serif;
+    display:flex;
+    align-items:center;
+    gap: 5px;
+  }
+  .icon-btn:hover{ border-color: var(--ink-soft); color: var(--ink); }
+  .icon-btn.danger:hover{ border-color: var(--wishlist); color: var(--wishlist); }
+
+  /* ---------- Empty state ---------- */
+  .empty{
+    grid-column: 1 / -1;
+    text-align:center;
+    padding: 60px 20px;
+    color: var(--ink-soft);
+  }
+  .empty svg{ margin-bottom: 14px; }
+  .empty h3{ color: var(--ink); margin: 0 0 6px; font-size: 1.3rem; }
+  .empty p{ margin: 0; font-size: 0.92rem; }
+
+  /* ---------- Modal ---------- */
+  .overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(46,43,78,0.35);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding: 20px;
+    z-index: 50;
+  }
+  .overlay.open{ display:flex; }
+
+  .modal{
+    background: var(--paper-raised);
+    border-radius: 20px;
+    padding: 28px;
+    width: 100%;
+    max-width: 480px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 50px rgba(46,43,78,0.25);
+  }
+
+  .modal h2{
+    margin: 0 0 18px;
+    font-size: 1.4rem;
+  }
+
+  .field{
+    margin-bottom: 15px;
+    display:flex;
+    flex-direction:column;
+    gap: 6px;
+  }
+
+  .field label{
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    font-weight: 600;
+  }
+
+  .field input[type="text"],
+  .field select,
+  .field textarea{
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-family:'Karla', sans-serif;
+    font-size: 0.95rem;
+    background: var(--paper);
+    color: var(--ink);
+    width: 100%;
+  }
+  .field textarea{ resize: vertical; min-height: 60px; }
+  .field input:focus, .field select:focus, .field textarea:focus{
+    outline: 2px solid var(--marigold);
+    outline-offset: 1px;
+  }
+
+  .two-col{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .star-input{
+    display:flex;
+    gap: 4px;
+  }
+  .star-input svg{
+    width: 26px; height: 26px;
+    cursor: pointer;
+  }
+
+  .modal-actions{
+    display:flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 22px;
+  }
+
+  button.ghost{
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink-soft);
+    padding: 10px 18px;
+    border-radius: 999px;
+    font-family:'Karla', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.ghost:hover{ border-color: var(--ink-soft); color: var(--ink); }
+  button.ghost:focus-visible{
+    outline: 2px solid var(--marigold);
+    outline-offset: 2px;
+  }
+  button.primary:focus-visible{
+    outline: 3px solid var(--ink);
+    outline-offset: 3px;
+  }
+  .chip:focus-visible{
+    outline: 2px solid var(--marigold);
+    outline-offset: 2px;
+  }
+  .icon-btn:focus-visible{
+    outline: 2px solid var(--marigold);
+    outline-offset: 2px;
+  }
+  .icon-btn{
+    transition: border-color 0.12s, color 0.12s;
+  }
+
+  /* ---------- Field error state ---------- */
+  .field input.field-error,
+  .field select.field-error,
+  .field textarea.field-error{
+    border-color: var(--danger);
+    outline-color: var(--danger);
+  }
+  .field-error-msg{
+    font-size: 0.78rem;
+    color: var(--danger);
+    font-weight: 600;
+    display: none;
+    margin-top: 2px;
+  }
+  .field-error-msg.visible{ display: block; }
+
+  /* ---------- Corrupt data banner ---------- */
+  .corrupt-banner{
+    background: var(--warning-bg);
+    border: 1px solid var(--warning);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 18px;
+    font-size: 0.88rem;
+    color: var(--ink);
+    display:none;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .corrupt-banner.visible{ display:flex; }
+  .corrupt-banner strong{ color: var(--warning); }
+
+  /* ---------- Confirm modal ---------- */
+  .confirm-overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(46,43,78,0.45);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding: 20px;
+    z-index: 60;
+  }
+  .confirm-overlay.open{ display:flex; }
+  .confirm-box{
+    background: var(--paper-raised);
+    border-radius: 16px;
+    padding: 24px 28px;
+    width: 100%;
+    max-width: 360px;
+    box-shadow: 0 16px 40px rgba(46,43,78,0.22);
+    text-align:center;
+  }
+  .confirm-box h3{
+    margin: 0 0 8px;
+    font-size: 1.2rem;
+    font-family: 'Baloo 2', sans-serif;
+  }
+  .confirm-box p{
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+    margin: 0 0 20px;
+  }
+  .confirm-actions{
+    display:flex;
+    gap: 10px;
+    justify-content: center;
+  }
+  button.danger-btn{
+    background: var(--danger);
+    color: #fff;
+    border: none;
+    font-family: 'Baloo 2', sans-serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    padding: 10px 20px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  button.danger-btn:hover{ background: #a93226; }
+  button.danger-btn:focus-visible{
+    outline: 3px solid var(--ink);
+    outline-offset: 3px;
+  }
+
+  /* ---------- Loading state ---------- */
+  .loading-state{
+    grid-column: 1 / -1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap: 14px;
+    padding: 60px 20px;
+    color: var(--ink-soft);
+  }
+  .spinner{
+    width: 36px; height: 36px;
+    border: 3px solid var(--line);
+    border-top-color: var(--marigold);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+
+  /* ---------- Toast ---------- */
+  #toastContainer{
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 99;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap: 8px;
+    pointer-events: none;
+  }
+  .toast{
+    background: var(--ink);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 999px;
+    font-size: 0.88rem;
+    font-family: 'Karla', sans-serif;
+    box-shadow: 0 4px 16px rgba(46,43,78,0.25);
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    max-width: 340px;
+    text-align:center;
+    pointer-events: auto;
+  }
+  .toast.show{ opacity: 1; transform: translateY(0); }
+  .toast.error{ background: var(--danger); }
+  .toast.warning{ background: var(--warning); }
+
+  /* ---------- Screen-reader only ---------- */
+  .sr-only{
+    position:absolute; width:1px; height:1px;
+    padding:0; margin:-1px; overflow:hidden;
+    clip:rect(0,0,0,0); white-space:nowrap; border:0;
+  }
+
+  /* ---------- Test runner panel ---------- */
+  #testPanel{
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    font-family: monospace;
+    font-size: 0.78rem;
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 10px 16px;
+    z-index: 100;
+    border-top: 2px solid #313244;
+  }
+  #testPanel.visible{ display:block; }
+  #testPanel .pass{ color: #a6e3a1; }
+  #testPanel .fail{ color: #f38ba8; }
+  #testPanel .section{ color: #89b4fa; margin-top: 6px; font-weight:bold; }
+
+  @media (max-width: 560px){
+    .stats{ grid-template-columns: 1fr; }
+    .two-col{ grid-template-columns: 1fr; }
+    header.top{ align-items:flex-start; }
+    button.primary{ width: 100%; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg width="52" height="52" viewBox="0 0 52 52" fill="none" aria-hidden="true">
+        <rect x="6" y="12" width="12" height="30" rx="2" fill="#3E8FC2"/>
+        <rect x="20" y="8" width="12" height="34" rx="2" fill="#F2A93B"/>
+        <rect x="34" y="15" width="12" height="27" rx="2" fill="#D6547A"/>
+        <rect x="4" y="42" width="44" height="4" rx="2" fill="#2E2B4E"/>
+      </svg>
+      <div>
+        <h1>Masa Simpan</h1>
+        <p>Pelacak buku papan &amp; buku bergambar si kecil</p>
+      </div>
+    </div>
+    <button class="primary" id="btnAdd" aria-label="Tambah buku baru">+ Tambah buku</button>
+  </header>
+
+  <!-- Corrupt data banner -->
+  <div class="corrupt-banner" id="corruptBanner" role="alert" aria-live="polite">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span id="corruptBannerText"></span>
+  </div>
+
+  <section class="stats" aria-label="Ringkasan koleksi">
+    <div class="stat owned">
+      <div>
+        <div class="num" id="countOwned" aria-live="polite" aria-label="Jumlah buku dimiliki">0</div>
+        <div class="label">Dimiliki</div>
+      </div>
+      <div class="dot" aria-hidden="true"></div>
+    </div>
+    <div class="stat borrowed">
+      <div>
+        <div class="num" id="countBorrowed" aria-live="polite" aria-label="Jumlah buku dipinjam">0</div>
+        <div class="label">Dipinjam</div>
+      </div>
+      <div class="dot" aria-hidden="true"></div>
+    </div>
+    <div class="stat wishlist">
+      <div>
+        <div class="num" id="countWishlist" aria-live="polite" aria-label="Jumlah daftar keinginan">0</div>
+        <div class="label">Daftar keinginan</div>
+      </div>
+      <div class="dot" aria-hidden="true"></div>
+    </div>
+  </section>
+
+  <section class="controls" aria-label="Cari dan filter">
+    <div class="search-row">
+      <label for="searchInput" class="sr-only">Cari buku</label>
+      <input type="text" id="searchInput" placeholder="Cari judul atau pengarang..." aria-label="Cari judul atau pengarang">
+    </div>
+    <div class="chip-groups">
+      <div class="chip-group" id="statusChips" data-filter="status" role="radiogroup" aria-label="Filter status">
+        <span class="gname" aria-hidden="true">Status</span>
+        <button class="chip active" data-value="all" role="radio" aria-checked="true">Semua</button>
+        <button class="chip" data-value="owned" role="radio" aria-checked="false">Dimiliki</button>
+        <button class="chip" data-value="borrowed" role="radio" aria-checked="false">Dipinjam</button>
+        <button class="chip" data-value="wishlist" role="radio" aria-checked="false">Daftar keinginan</button>
+      </div>
+      <div class="chip-group" id="ageChips" data-filter="age" role="radiogroup" aria-label="Filter usia">
+        <span class="gname" aria-hidden="true">Usia</span>
+        <button class="chip active" data-value="all" role="radio" aria-checked="true">Semua</button>
+        <button class="chip" data-value="0-2" role="radio" aria-checked="false">0–2 tahun</button>
+        <button class="chip" data-value="3-5" role="radio" aria-checked="false">3–5 tahun</button>
+        <button class="chip" data-value="6-8" role="radio" aria-checked="false">6–8 tahun</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid" id="bookGrid" aria-label="Koleksi buku" aria-live="polite"></section>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal">
+    <h2 id="modalTitle">Tambah buku</h2>
+    <form id="bookForm" novalidate>
+      <input type="hidden" id="bookId">
+      <div class="field">
+        <label for="fieldTitle">Judul <span aria-hidden="true" style="color:var(--danger)">*</span></label>
+        <input type="text" id="fieldTitle" autocomplete="off" placeholder="Misalnya: Ada Ulat Hijau" aria-required="true" aria-describedby="fieldTitleErr">
+        <span class="field-error-msg" id="fieldTitleErr" role="alert"></span>
+      </div>
+      <div class="field">
+        <label for="fieldAuthor">Pengarang / ilustrator <span aria-hidden="true" style="color:var(--danger)">*</span></label>
+        <input type="text" id="fieldAuthor" autocomplete="off" placeholder="Nama pengarang" aria-required="true" aria-describedby="fieldAuthorErr">
+        <span class="field-error-msg" id="fieldAuthorErr" role="alert"></span>
+      </div>
+      <div class="two-col">
+        <div class="field">
+          <label for="fieldAge">Rentang usia</label>
+          <select id="fieldAge">
+            <option value="0-2">0–2 tahun</option>
+            <option value="3-5">3–5 tahun</option>
+            <option value="6-8">6–8 tahun</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="fieldStatus">Status</label>
+          <select id="fieldStatus">
+            <option value="owned">Dimiliki</option>
+            <option value="borrowed">Dipinjam</option>
+            <option value="wishlist">Daftar keinginan</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Peringkat</label>
+        <div class="star-input" id="starInput" role="radiogroup" aria-label="Beri peringkat 1 sampai 5 bintang"></div>
+        <span class="field-error-msg" id="starInputErr" role="alert"></span>
+      </div>
+      <div class="field">
+        <label for="fieldNotes">Catatan singkat (opsional)</label>
+        <textarea id="fieldNotes" placeholder="Misalnya: menangis setiap kali dibacakan" aria-describedby="fieldNotesErr"></textarea>
+        <span class="field-error-msg" id="fieldNotesErr" role="alert"></span>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="ghost" id="btnCancel">Batal</button>
+        <button type="submit" class="primary" id="btnSave">Simpan buku</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Confirm Delete Modal -->
+<div class="confirm-overlay" id="confirmOverlay" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+  <div class="confirm-box">
+    <h3 id="confirmTitle">Hapus buku?</h3>
+    <p id="confirmDesc">Tindakan ini tidak dapat dibatalkan.</p>
+    <div class="confirm-actions">
+      <button class="ghost" id="confirmCancel">Batal</button>
+      <button class="danger-btn" id="confirmOk">Hapus</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toastContainer" aria-live="assertive" aria-atomic="true"></div>
+
+<!-- Test output panel (?tests=1) -->
+<div id="testPanel" role="log" aria-label="Hasil pengujian otomatis"></div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ============================================================
+   *  Constants
+   * ============================================================ */
+  const STORAGE_KEY = 'masaSimpanBooks';
+
+  const statusLabels = { owned: 'Dimiliki', borrowed: 'Dipinjam', wishlist: 'Daftar keinginan' };
+  const ageLabels = { '0-2': '0–2 tahun', '3-5': '3–5 tahun', '6-8': '6–8 tahun' };
+
+  let books = loadBooks();
+  let currentRating = 0;
+  let editingId = null;
+  let activeFilters = { status: 'all', age: 'all', search: '' };
+
+  function loadBooks(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    }catch(e){
+      console.error('Gagal memuat data buku', e);
+      return [];
+    }
+  }
+
+  function saveBooks(){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
+  }
+
+  function uid(){
+    return 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+  }
+
+  function starSVG(filled){
+    return `<svg viewBox="0 0 24 24" fill="${filled ? 'var(--star)' : 'none'}" stroke="var(--star)" stroke-width="1.5">
+      <polygon points="12 2 15.09 8.63 22 9.24 16.5 14.14 18.18 21 12 17.27 5.82 21 7.5 14.14 2 9.24 8.91 8.63"/>
+    </svg>`;
+  }
+
+  function renderStarsDisplay(rating){
+    let html = '<div class="stars">';
+    for(let i=1;i<=5;i++){ html += starSVG(i<=rating); }
+    html += '</div>';
+    return html;
+  }
+
+  function buildStarInput(){
+    const container = document.getElementById('starInput');
+    container.innerHTML = '';
+    for(let i=1;i<=5;i++){
+      const span = document.createElement('span');
+      span.innerHTML = starSVG(i<=currentRating);
+      span.dataset.value = i;
+      span.addEventListener('click', () => {
+        currentRating = i;
+        buildStarInput();
+      });
+      container.appendChild(span);
+    }
+  }
+
+  function escapeHTML(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function updateCounts(){
+    document.getElementById('countOwned').textContent = books.filter(b => b.status === 'owned').length;
+    document.getElementById('countBorrowed').textContent = books.filter(b => b.status === 'borrowed').length;
+    document.getElementById('countWishlist').textContent = books.filter(b => b.status === 'wishlist').length;
+  }
+
+  function getFilteredBooks(){
+    return books.filter(b => {
+      if(activeFilters.status !== 'all' && b.status !== activeFilters.status) return false;
+      if(activeFilters.age !== 'all' && b.age !== activeFilters.age) return false;
+      if(activeFilters.search){
+        const q = activeFilters.search.toLowerCase();
+        if(!b.title.toLowerCase().includes(q) && !b.author.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }
+
+  function render(){
+    updateCounts();
+    const grid = document.getElementById('bookGrid');
+    const filtered = getFilteredBooks();
+
+    if(filtered.length === 0){
+      grid.innerHTML = `
+        <div class="empty">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+            <rect x="8" y="16" width="14" height="36" rx="2" fill="#E5DBC8"/>
+            <rect x="25" y="10" width="14" height="42" rx="2" fill="#EFEAF9"/>
+            <rect x="42" y="18" width="14" height="34" rx="2" fill="#E5DBC8"/>
+          </svg>
+          <h3>${books.length === 0 ? 'Rak masih kosong' : 'Tidak ada buku yang cocok'}</h3>
+          <p>${books.length === 0 ? 'Tambahkan buku pertama dari koleksi Anda.' : 'Coba ubah kata kunci atau filter yang dipakai.'}</p>
+        </div>`;
+      return;
+    }
+
+    grid.innerHTML = filtered.map(b => `
+      <article class="card status-${b.status}">
+        <div class="top-row">
+          <div>
+            <h3>${escapeHTML(b.title)}</h3>
+            <p class="author">${escapeHTML(b.author)}</p>
+          </div>
+        </div>
+        <div class="badge-row">
+          <span class="badge status-${b.status}">${statusLabels[b.status]}</span>
+          <span class="badge age">${ageLabels[b.age] || b.age}</span>
+        </div>
+        ${renderStarsDisplay(b.rating)}
+        ${b.notes ? `<p class="notes">"${escapeHTML(b.notes)}"</p>` : ''}
+        <div class="card-actions">
+          <button class="icon-btn" data-action="edit" data-id="${b.id}">Ubah</button>
+          <button class="icon-btn danger" data-action="delete" data-id="${b.id}">Hapus</button>
+        </div>
+      </article>
+    `).join('');
+  }
+
+  // ---- Modal handling ----
+  const overlay = document.getElementById('overlay');
+  const form = document.getElementById('bookForm');
+  const modalTitle = document.getElementById('modalTitle');
+
+  function openModal(book){
+    editingId = book ? book.id : null;
+    modalTitle.textContent = book ? 'Ubah buku' : 'Tambah buku';
+    document.getElementById('fieldTitle').value = book ? book.title : '';
+    document.getElementById('fieldAuthor').value = book ? book.author : '';
+    document.getElementById('fieldAge').value = book ? book.age : '0-2';
+    document.getElementById('fieldStatus').value = book ? book.status : 'owned';
+    document.getElementById('fieldNotes').value = book ? (book.notes || '') : '';
+    currentRating = book ? book.rating : 0;
+    buildStarInput();
+    overlay.classList.add('open');
+    document.getElementById('fieldTitle').focus();
+  }
+
+  function closeModal(){
+    overlay.classList.remove('open');
+    form.reset();
+    editingId = null;
+    currentRating = 0;
+  }
+
+  document.getElementById('btnAdd').addEventListener('click', () => openModal(null));
+  document.getElementById('btnCancel').addEventListener('click', closeModal);
+  overlay.addEventListener('click', (e) => { if(e.target === overlay) closeModal(); });
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const title = document.getElementById('fieldTitle').value.trim();
+    const author = document.getElementById('fieldAuthor').value.trim();
+    const age = document.getElementById('fieldAge').value;
+    const status = document.getElementById('fieldStatus').value;
+    const notes = document.getElementById('fieldNotes').value.trim();
+
+    if(!title || !author) return;
+
+    if(editingId){
+      const idx = books.findIndex(b => b.id === editingId);
+      if(idx > -1){
+        books[idx] = { ...books[idx], title, author, age, status, notes, rating: currentRating };
+      }
+    } else {
+      books.push({ id: uid(), title, author, age, status, notes, rating: currentRating });
+    }
+
+    saveBooks();
+    closeModal();
+    render();
+  });
+
+  document.getElementById('bookGrid').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-action]');
+    if(!btn) return;
+    const id = btn.dataset.id;
+    if(btn.dataset.action === 'edit'){
+      const book = books.find(b => b.id === id);
+      if(book) openModal(book);
+    } else if(btn.dataset.action === 'delete'){
+      if(confirm('Hapus buku ini dari koleksi?')){
+        books = books.filter(b => b.id !== id);
+        saveBooks();
+        render();
+      }
+    }
+  });
+
+  // ---- Filters ----
+  document.querySelectorAll('.chip-group').forEach(group => {
+    group.addEventListener('click', (e) => {
+      const chip = e.target.closest('.chip');
+      if(!chip) return;
+      group.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      const filterKey = group.dataset.filter;
+      activeFilters[filterKey] = chip.dataset.value;
+      render();
+    });
+  });
+
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    activeFilters.search = e.target.value.trim();
+    render();
+  });
+
+  render();
+})();
+</script>
+
+</body>
+</html>
